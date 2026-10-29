@@ -193,19 +193,6 @@ async def cmd_links(message: types.Message):
     # parse_mode="Markdown" сделает заголовок жирным
     await message.answer(links_text, parse_mode="Markdown")
 
-# --- ЗАПУСК ---
-async def main():
-    print("Бот запущен...")
-    await dp.start_polling(bot)
-
-def run_bot():
-    asyncio.run(main())
-
-if __name__ == "__main__":
-    bot_thread = threading.Thread(target=run_bot)
-    bot_thread.start()
-    port = int(os.environ.get("PORT", 5000))
-    web_app.run(host='0.0.0.0', port=port)
 
 # --- ВЕБ-СЕРВЕР ДЛЯ RENDER ---
 
