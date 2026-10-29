@@ -1,31 +1,23 @@
-import asyncio
-import threading
-from flask import Flask
-# ... твои остальные импорты (os, dotenv, aiogram, aiohttp и т.д.)
-
-# Создаем Flask-приложение
-web_app = Flask(__name__)
-
-@web_app.route('/')
-@web_app.route('/health')
-def health_check():
-    return "Bot is running", 200
-
 import os
-from dotenv import load_dotenv
 import asyncio
+import json
 from datetime import datetime, timedelta
+from flask import Flask, request, abort
+from dotenv import load_dotenv
+
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
+import aiohttp
 
-load_dotenv()  # Это загрузит .env, если он есть локально (на твоем ПК)
+load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 JOURNAL_LOGIN = os.getenv("JOURNAL_LOGIN")
 JOURNAL_PASSWORD = os.getenv("JOURNAL_PASSWORD")
 
-# Инициализация бота
+# Инициализация
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
+app = Flask(__name__)
 
 # --- ФУНКЦИЯ ПОЛУЧЕНИЯ РАСПИСАНИЯ ---
 import aiohttp
@@ -207,15 +199,35 @@ async def main():
     await dp.start_polling(bot)
 
 def run_bot():
-    # Эта функция запускает твоего бота
     asyncio.run(main())
 
 if __name__ == "__main__":
-    # Запускаем бота в отдельном потоке
     bot_thread = threading.Thread(target=run_bot)
     bot_thread.start()
-    
-    # Запускаем Flask-сервер, чтобы Render видел порт
-    import os
     port = int(os.environ.get("PORT", 5000))
     web_app.run(host='0.0.0.0', port=port)
+
+# --- ВЕБ-СЕРВЕР ДЛЯ RENDER ---
+
+@app.route(f"/{BOT_TOKEN}", methods=["POST"])
+def webhook():
+    """Этот эндпоинт принимает сообщения от Telegram."""
+    if request.headers.get("content-type") != "application/json":
+        abort(403)
+    
+    json_string = request.get_data().decode("utf-8")
+    update = types.Update.model_validate_json(json_string)
+    
+    # Обрабатываем сообщение
+    asyncio.run(dp.feed_update(bot, update))
+    return "OK", 200
+
+@app.route("/")
+def health_check():
+    """Этот эндпоинт нужен, чтобы Render видел, что сервис жив."""
+    return "Bot is running", 200
+
+# Запуск Flask-сервера (именно он будет работать на Render)
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
